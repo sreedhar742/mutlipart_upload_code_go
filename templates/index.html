@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaces Multipart Upload</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f4efe7;
+            --panel: rgba(255, 252, 246, 0.92);
+            --panel-strong: #fffdf8;
+            --text: #231815;
+            --muted: #6a5a52;
+            --line: rgba(35, 24, 21, 0.12);
+            --accent: #d56a3f;
+            --accent-dark: #9f4320;
+            --success: #1c7c54;
+            --shadow: 0 24px 60px rgba(74, 45, 31, 0.12);
+            --radius: 24px;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: "Segoe UI", "Helvetica Neue", sans-serif;
+            color: var(--text);
+            background:
+                radial-gradient(circle at top left, rgba(213, 106, 63, 0.22), transparent 32%),
+                radial-gradient(circle at right, rgba(28, 124, 84, 0.16), transparent 28%),
+                linear-gradient(160deg, #f7f2ea 0%, #f0e6d9 52%, #eadcca 100%);
+            padding: 32px 20px 56px;
+        }
+
+        .shell {
+            width: min(1080px, 100%);
+            margin: 0 auto;
+            display: grid;
+            gap: 24px;
+        }
+
+        .hero,
+        .panel {
+            background: var(--panel);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--line);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .hero {
+            padding: 32px;
+        }
+
+        .eyebrow {
+            margin: 0 0 8px;
+            color: var(--accent-dark);
+            font-size: 0.82rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: clamp(2rem, 4vw, 3.4rem);
+            line-height: 0.95;
+            max-width: 10ch;
+        }
+
+        .hero p {
+            margin: 16px 0 0;
+            max-width: 640px;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.6;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+            gap: 24px;
+        }
+
+        .panel {
+            padding: 24px;
+        }
+
+        .panel h2 {
+            margin: 0 0 8px;
+            font-size: 1.3rem;
+        }
+
+        .panel p {
+            margin: 0 0 20px;
+            color: var(--muted);
+            line-height: 1.5;
+        }
+
+        .upload-box {
+            border: 1px dashed rgba(213, 106, 63, 0.45);
+            border-radius: 20px;
+            background: var(--panel-strong);
+            padding: 20px;
+        }
+
+        .upload-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+        }
+
+        input[type="file"] {
+            max-width: 100%;
+            color: var(--muted);
+        }
+
+        button {
+            border: 0;
+            border-radius: 999px;
+            padding: 12px 18px;
+            font-size: 0.95rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.16s ease, opacity 0.16s ease, background 0.16s ease;
+        }
+
+        button:hover {
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: wait;
+            transform: none;
+        }
+
+        .primary {
+            color: #fff9f4;
+            background: linear-gradient(135deg, var(--accent) 0%, #bc4e28 100%);
+        }
+
+        .secondary {
+            color: var(--text);
+            background: rgba(35, 24, 21, 0.08);
+        }
+
+        .status {
+            margin-top: 18px;
+            min-height: 24px;
+            font-weight: 600;
+        }
+
+        .status.error {
+            color: #ab2f2f;
+        }
+
+        .status.success {
+            color: var(--success);
+        }
+
+        .meter {
+            margin-top: 16px;
+            width: 100%;
+            height: 12px;
+            appearance: none;
+            border: 0;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(35, 24, 21, 0.08);
+        }
+
+        .meter::-webkit-progress-bar {
+            background: rgba(35, 24, 21, 0.08);
+        }
+
+        .meter::-webkit-progress-value {
+            background: linear-gradient(90deg, var(--accent), #e2a54d);
+            border-radius: 999px;
+        }
+
+        .meter::-moz-progress-bar {
+            background: linear-gradient(90deg, var(--accent), #e2a54d);
+            border-radius: 999px;
+        }
+
+        .meta {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 0.92rem;
+        }
+
+        .stats {
+            display: grid;
+            gap: 14px;
+        }
+
+        .stat {
+            padding: 16px 18px;
+            border-radius: 18px;
+            background: var(--panel-strong);
+            border: 1px solid var(--line);
+        }
+
+        .stat-label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 0.84rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+        }
+
+        .stat-value {
+            font-size: 1.45rem;
+            font-weight: 800;
+        }
+
+        .list-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .list {
+            display: grid;
+            gap: 14px;
+        }
+
+        .file-card {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 14px;
+            align-items: center;
+            padding: 18px;
+            border-radius: 20px;
+            background: var(--panel-strong);
+            border: 1px solid var(--line);
+        }
+
+        .file-name {
+            margin: 0 0 6px;
+            font-size: 1rem;
+            font-weight: 700;
+            word-break: break-word;
+        }
+
+        .file-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            color: var(--muted);
+            font-size: 0.9rem;
+        }
+
+        .empty {
+            padding: 26px 18px;
+            border-radius: 20px;
+            background: rgba(255, 253, 248, 0.72);
+            border: 1px dashed var(--line);
+            color: var(--muted);
+            text-align: center;
+        }
+
+        @media (max-width: 860px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 640px) {
+            body {
+                padding: 18px 14px 32px;
+            }
+
+            .hero,
+            .panel {
+                padding: 20px;
+            }
+
+            .file-card {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <section class="hero">
+            <p class="eyebrow">DigitalOcean Spaces</p>
+            <h1>Multipart uploads with direct downloads</h1>
+            <p>Large files upload in 5 MB parts directly to your bucket, metadata is saved in Postgres, and every uploaded file stays available from the dashboard with a one-click download link.</p>
+        </section>
+
+        <section class="grid">
+            <div class="panel">
+                <h2>Upload a file</h2>
+                <p>Select any file and the browser will upload it to Spaces in multipart chunks.</p>
+
+                <div class="upload-box">
+                    <div class="upload-actions">
+                        <input type="file" id="file">
+                        <button id="uploadButton" class="primary" type="button">Upload to Spaces</button>
+                    </div>
+
+                    <progress id="progressBar" class="meter" value="0" max="100"></progress>
+                    <div id="status" class="status"></div>
+                    <div id="meta" class="meta"></div>
+                </div>
+            </div>
+
+            <aside class="panel">
+                <h2>Overview</h2>
+                <p>Quick summary of what is already stored through this service.</p>
+                <div class="stats">
+                    <div class="stat">
+                        <span class="stat-label">Uploaded files</span>
+                        <span id="fileCount" class="stat-value">0</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Stored size</span>
+                        <span id="totalSize" class="stat-value">0 B</span>
+                    </div>
+                    <div class="stat">
+                        <span class="stat-label">Chunk strategy</span>
+                        <span class="stat-value">5 MB parts</span>
+                    </div>
+                </div>
+            </aside>
+        </section>
+
+        <section class="panel">
+            <div class="list-head">
+                <div>
+                    <h2>Uploaded files</h2>
+                    <p>Each item is pulled from the database and can generate a fresh signed download URL.</p>
+                </div>
+                <button id="refreshButton" class="secondary" type="button">Refresh list</button>
+            </div>
+            <div id="list" class="list"></div>
+        </section>
+    </main>
+
+    <script>
+        const chunkSize = 5 * 1024 * 1024;
+        const fileInput = document.getElementById("file");
+        const uploadButton = document.getElementById("uploadButton");
+        const refreshButton = document.getElementById("refreshButton");
+        const progressBar = document.getElementById("progressBar");
+        const statusNode = document.getElementById("status");
+        const metaNode = document.getElementById("meta");
+        const listNode = document.getElementById("list");
+        const fileCountNode = document.getElementById("fileCount");
+        const totalSizeNode = document.getElementById("totalSize");
+
+        function formatBytes(bytes) {
+            if (!bytes) return "0 B";
+            const units = ["B", "KB", "MB", "GB", "TB"];
+            let size = bytes;
+            let unitIndex = 0;
+            while (size >= 1024 && unitIndex < units.length - 1) {
+                size /= 1024;
+                unitIndex++;
+            }
+            return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+        }
+
+        function setStatus(message, type = "") {
+            statusNode.textContent = message;
+            statusNode.className = `status ${type}`.trim();
+        }
+
+        function setMeta(items = []) {
+            metaNode.innerHTML = items.map((item) => `<span>${item}</span>`).join("");
+        }
+
+        async function fetchJSON(url, options) {
+            const response = await fetch(url, options);
+            if (!response.ok) {
+                const message = await response.text();
+                throw new Error(message || "Request failed");
+            }
+            return response.json();
+        }
+
+        async function upload() {
+            const file = fileInput.files[0];
+            if (!file) {
+                setStatus("Select a file before uploading.", "error");
+                return;
+            }
+
+            uploadButton.disabled = true;
+            progressBar.value = 0;
+
+            const totalParts = Math.max(1, Math.ceil(file.size / chunkSize));
+            setStatus("Starting multipart upload...", "");
+            setMeta([
+                `File: ${file.name}`,
+                `Size: ${formatBytes(file.size)}`,
+                `Parts: ${totalParts}`
+            ]);
+
+            try {
+                const { uploadId, key } = await fetchJSON(`/multipart/start?filename=${encodeURIComponent(file.name)}`);
+                const parts = [];
+
+                for (let i = 0; i < totalParts; i++) {
+                    const partNumber = i + 1;
+                    const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
+
+                    setStatus(`Uploading part ${partNumber} of ${totalParts}...`, "");
+                    const { url } = await fetchJSON(`/multipart/url?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`);
+
+                    const uploadResponse = await fetch(url, {
+                        method: "PUT",
+                        body: chunk
+                    });
+
+                    if (!uploadResponse.ok) {
+                        throw new Error(`Part ${partNumber} upload failed`);
+                    }
+
+                    let etag = uploadResponse.headers.get("ETag") || uploadResponse.headers.get("etag");
+                    if (!etag) {
+                        throw new Error("ETag missing. Configure Spaces CORS to expose the ETag header.");
+                    }
+
+                    etag = etag.replace(/"/g, "");
+                    parts.push({ ETag: etag, PartNumber: partNumber });
+                    progressBar.value = Math.round((partNumber / totalParts) * 100);
+                }
+
+                setStatus("Finalizing multipart upload...", "");
+                await fetchJSON("/multipart/complete", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ key, uploadId, parts })
+                });
+
+                await fetchJSON("/save", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        filename: file.name,
+                        key,
+                        size: file.size
+                    })
+                });
+
+                progressBar.value = 100;
+                setStatus("Upload completed successfully.", "success");
+                await loadFiles();
+            } catch (error) {
+                setStatus(error.message || "Upload failed", "error");
+            } finally {
+                uploadButton.disabled = false;
+            }
+        }
+
+        async function downloadFile(key) {
+            try {
+                const { url } = await fetchJSON(`/download-url?key=${encodeURIComponent(key)}`);
+                window.open(url, "_blank", "noopener,noreferrer");
+            } catch (error) {
+                setStatus(error.message || "Download link failed", "error");
+            }
+        }
+
+        async function loadFiles() {
+            try {
+                const files = await fetchJSON("/files");
+                fileCountNode.textContent = String(files.length);
+                const totalSize = files.reduce((sum, file) => sum + Number(file.size || 0), 0);
+                totalSizeNode.textContent = formatBytes(totalSize);
+
+                if (!files.length) {
+                    listNode.innerHTML = `<div class="empty">No uploads yet. Finish one upload and it will appear here.</div>`;
+                    return;
+                }
+
+                listNode.innerHTML = files.map((file) => `
+                    <article class="file-card">
+                        <div>
+                            <h3 class="file-name">${file.name}</h3>
+                            <div class="file-details">
+                                <span>${formatBytes(file.size)}</span>
+                                <span>${file.key}</span>
+                            </div>
+                        </div>
+                        <button class="primary" type="button" data-key="${file.key}">Download</button>
+                    </article>
+                `).join("");
+            } catch (error) {
+                listNode.innerHTML = `<div class="empty">Failed to load files: ${error.message || "unknown error"}</div>`;
+            }
+        }
+
+        uploadButton.addEventListener("click", upload);
+        refreshButton.addEventListener("click", loadFiles);
+        listNode.addEventListener("click", (event) => {
+            const button = event.target.closest("button[data-key]");
+            if (!button) return;
+            downloadFile(button.dataset.key);
+        });
+
+        loadFiles();
+    </script>
+</body>
+</html>
