@@ -353,6 +353,7 @@
 
     <script>
         const chunkSize = 5 * 1024 * 1024;
+        const maxParallelUploads = 4;
         const fileInput = document.getElementById("file");
         const uploadButton = document.getElementById("uploadButton");
         const refreshButton = document.getElementById("refreshButton");
@@ -393,6 +394,52 @@
             return response.json();
         }
 
+        async function uploadPart(file, key, uploadId, partNumber) {
+            const start = (partNumber - 1) * chunkSize;
+            const chunk = file.slice(start, start + chunkSize);
+            const { url } = await fetchJSON(`/multipart/url?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`);
+
+            const uploadResponse = await fetch(url, {
+                method: "PUT",
+                body: chunk
+            });
+
+            if (!uploadResponse.ok) {
+                throw new Error(`Part ${partNumber} upload failed`);
+            }
+
+            let etag = uploadResponse.headers.get("ETag") || uploadResponse.headers.get("etag");
+            if (!etag) {
+                throw new Error("ETag missing. Configure Spaces CORS to expose the ETag header.");
+            }
+
+            return {
+                ETag: etag.replace(/"/g, ""),
+                PartNumber: partNumber
+            };
+        }
+
+        async function uploadPartsInParallel(file, key, uploadId, totalParts) {
+            const parts = new Array(totalParts);
+            let nextPart = 1;
+            let uploadedParts = 0;
+            const workerCount = Math.min(maxParallelUploads, totalParts);
+
+            async function worker() {
+                while (nextPart <= totalParts) {
+                    const partNumber = nextPart++;
+                    setStatus(`Uploading ${uploadedParts} of ${totalParts} parts...`, "");
+                    parts[partNumber - 1] = await uploadPart(file, key, uploadId, partNumber);
+                    uploadedParts++;
+                    progressBar.value = Math.round((uploadedParts / totalParts) * 100);
+                    setStatus(`Uploading ${uploadedParts} of ${totalParts} parts...`, "");
+                }
+            }
+
+            await Promise.all(Array.from({ length: workerCount }, worker));
+            return parts;
+        }
+
         async function upload() {
             const file = fileInput.files[0];
             if (!file) {
@@ -404,42 +451,18 @@
             progressBar.value = 0;
 
             const totalParts = Math.max(1, Math.ceil(file.size / chunkSize));
+            const parallelUploads = Math.min(maxParallelUploads, totalParts);
             setStatus("Starting multipart upload...", "");
             setMeta([
                 `File: ${file.name}`,
                 `Size: ${formatBytes(file.size)}`,
-                `Parts: ${totalParts}`
+                `Parts: ${totalParts}`,
+                `Parallel uploads: ${parallelUploads}`
             ]);
 
             try {
                 const { uploadId, key } = await fetchJSON(`/multipart/start?filename=${encodeURIComponent(file.name)}`);
-                const parts = [];
-
-                for (let i = 0; i < totalParts; i++) {
-                    const partNumber = i + 1;
-                    const chunk = file.slice(i * chunkSize, (i + 1) * chunkSize);
-
-                    setStatus(`Uploading part ${partNumber} of ${totalParts}...`, "");
-                    const { url } = await fetchJSON(`/multipart/url?key=${encodeURIComponent(key)}&uploadId=${encodeURIComponent(uploadId)}&partNumber=${partNumber}`);
-
-                    const uploadResponse = await fetch(url, {
-                        method: "PUT",
-                        body: chunk
-                    });
-
-                    if (!uploadResponse.ok) {
-                        throw new Error(`Part ${partNumber} upload failed`);
-                    }
-
-                    let etag = uploadResponse.headers.get("ETag") || uploadResponse.headers.get("etag");
-                    if (!etag) {
-                        throw new Error("ETag missing. Configure Spaces CORS to expose the ETag header.");
-                    }
-
-                    etag = etag.replace(/"/g, "");
-                    parts.push({ ETag: etag, PartNumber: partNumber });
-                    progressBar.value = Math.round((partNumber / totalParts) * 100);
-                }
+                const parts = await uploadPartsInParallel(file, key, uploadId, totalParts);
 
                 setStatus("Finalizing multipart upload...", "");
                 await fetchJSON("/multipart/complete", {

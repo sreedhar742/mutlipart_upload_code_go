@@ -3,22 +3,17 @@ package handlers
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"os"
 	"sort"
+	"strconv"
+	"strings"
 
 	"scalable_upload/storage"
 
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
-
-func int32Ptr(s string) *int32 {
-	var i int32
-	fmt.Sscanf(s, "%d", &i)
-	return &i
-}
 
 // STEP 1: Start multipart upload
 func StartMultipartUpload(w http.ResponseWriter, r *http.Request) {
@@ -65,6 +60,12 @@ func GetPartUploadURL(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "key, uploadId and partNumber are required", http.StatusBadRequest)
 		return
 	}
+	partNumberValue, err := strconv.ParseInt(partNumber, 10, 32)
+	if err != nil || partNumberValue < 1 || partNumberValue > 10000 {
+		http.Error(w, "partNumber must be between 1 and 10000", http.StatusBadRequest)
+		return
+	}
+	partNumberInt32 := int32(partNumberValue)
 
 	req, err := storage.PresignClient.PresignUploadPart(
 		r.Context(),
@@ -72,7 +73,7 @@ func GetPartUploadURL(w http.ResponseWriter, r *http.Request) {
 			Bucket:     &bucket,
 			Key:        &key,
 			UploadId:   &uploadId,
-			PartNumber: int32Ptr(partNumber),
+			PartNumber: &partNumberInt32,
 		},
 	)
 
@@ -117,9 +118,24 @@ func CompleteMultipartUpload(w http.ResponseWriter, r *http.Request) {
 	})
 
 	var completedParts []types.CompletedPart
+	seenParts := make(map[int32]struct{}, len(data.Parts))
 
 	for _, p := range data.Parts {
-		etag := p.ETag
+		if p.PartNumber < 1 || p.PartNumber > 10000 {
+			http.Error(w, "part numbers must be between 1 and 10000", http.StatusBadRequest)
+			return
+		}
+		if _, exists := seenParts[p.PartNumber]; exists {
+			http.Error(w, "duplicate part numbers are not allowed", http.StatusBadRequest)
+			return
+		}
+		seenParts[p.PartNumber] = struct{}{}
+
+		etag := strings.Trim(p.ETag, `"`)
+		if etag == "" {
+			http.Error(w, "each part must include an ETag", http.StatusBadRequest)
+			return
+		}
 		completedParts = append(completedParts, types.CompletedPart{
 			ETag:       &etag,
 			PartNumber: &p.PartNumber,
