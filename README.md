@@ -1,6 +1,6 @@
 # Scalable Upload Video Encoder
 
-This app uploads original videos directly to DigitalOcean Spaces with multipart upload, enqueues an encoding job in Redis/Asynq, runs FFmpeg in a Go worker, uploads the generated thumbnail and 720p HLS files back to Spaces, and plays the final HLS stream in the browser.
+This app uploads original videos directly to DigitalOcean Spaces with multipart upload, enqueues an encoding job in Redis/Asynq, runs FFmpeg in a Go worker, uploads the generated thumbnail and adaptive 480p/720p/1080p HLS files back to Spaces, and plays the final HLS stream in the browser.
 
 ## Required Services
 
