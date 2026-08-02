@@ -14,9 +14,9 @@ This app uploads original videos directly to DigitalOcean Spaces with multipart 
 ```env
 SPACES_ACCESS_KEY=your_spaces_access_key
 SPACES_SECRET_KEY=your_spaces_secret_key
-SPACES_REGION=blr1
-SPACES_BUCKET=orcalexbucket
-PUBLIC_SPACES_BASE_URL=https://orcalexbucket.blr1.digitaloceanspaces.com
+SPACES_REGION=""
+SPACES_BUCKET=""
+PUBLIC_SPACES_BASE_URL=""
 
 DATABASE_URL=host=localhost port=5432 user=postgres password=postgres dbname=filesdb sslmode=disable
 REDIS_ADDR=localhost:6379
